@@ -1,32 +1,68 @@
 # -*- coding: utf-8 -*-
 import config
 import json
+import yaml
 
 import telebot
 from revChatGPT.V1 import Chatbot
 
+# Global variables
+bot = None
+chatgpt_model = None
+bot_token = None
+chatgpt_config_file = None
 
-bot = telebot.TeleBot(config.token)
-chatbot = Chatbot(config={
-    "email": "@10xt.tech",
-    "password": "!"
-})
-
-ACCOST_KEYWORDS = ("игорь", "игорек", "игоречек", "igor", "игорю", "игоря",
-                   "игорь,", "игорек,", "игоречек,", "igor,", "игорю,", "игоря,", "игорь!", "игорь?", )
+# Global constants
+KEYWORDS = ("игорь", "игорек", "игоречек", "igor", "игорю", "игоря",
+            "игорь,", "игорек,", "игоречек,", "igor,", "игорю,", "игоря,", "игорь!", "игорь?", )
 
 ERROR_MESSAGE = 'Ops, something went wrong :( Pls Ask Denis to check asap!'
 BOT_VERSION = '1.0'
+CONFIG_FILE_NAME = "config.yaml"
 
 
-def init(message):
-    bot.send_message(message.chat.id, 'Starting initial conversation training ...')
+# read config file
+with open(CONFIG_FILE_NAME, "r") as f:
+    cfg = yaml.safe_load(f)
+
+bot_token = cfg['CONFIG']['bot_token']
+bot_admin_chat = cfg['CONFIG']['bot_admin_chat']
+chatgpt_config_file = cfg['CONFIG']['chatgpt_config_file']
+
+# let's init the bot
+bot = telebot.TeleBot(bot_token)
+
+
+def init(message=None):
+    """
+    Init the bot and the chatgpt model
+
+    Args:
+        message (message, optional): message from user. Defaults to None.
+    """    
+
+    global chatgpt_model
+
+    if message is None:
+        chat_id = bot_admin_chat
+    else:
+        chat_id = message.chat.id
+
+    bot.send_message(chat_id, 'ChatGPT initialization ...')
+
     try:
+        with open(chatgpt_config_file, "r") as f:
+         
+            chatgpt_config = json.load(f)
+            chatgpt_model = Chatbot(config=chatgpt_config)
 
-        bot.send_message(message.chat.id, 'Initial training completed')
-
+        bot.send_message(chat_id, 'ChatGPT initialization completed')
+   
     except Exception as e:
-        bot.send_message(message.chat.id, ERROR_MESSAGE)
+        bot.send_message(chat_id, e)
+        pass
+
+    bot.send_message(chat_id, 'Igor initialization completed')
 
 
 def log_message(message, text, if_user=True):
@@ -70,7 +106,7 @@ def response_for_message(message):
 
     for word in message.text.split():
 
-        if word.lower() in ACCOST_KEYWORDS:
+        if word.lower() in KEYWORDS:
 
             message_id = message.id
             chat = message.chat.id
@@ -83,7 +119,7 @@ def response_for_message(message):
 
             response = ""
 
-            for data in chatbot.ask(message_text):
+            for data in chatgpt_model.ask(message_text):
                 response = data["message"]
 
             bot.send_message(message.chat.id, response)
@@ -92,4 +128,7 @@ def response_for_message(message):
 
 
 if __name__ == '__main__':
+
+    init()
+
     bot.polling(none_stop=True)
