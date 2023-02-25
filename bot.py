@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import config
 import json
 import yaml
 
@@ -11,6 +10,9 @@ bot = None
 chatgpt_model = None
 bot_token = None
 chatgpt_config_file = None
+admin_chat = None
+
+users_in_que = 0
 
 # Global constants
 KEYWORDS = ("игорь", "игорек", "игоречек", "igor", "игорю", "игоря",
@@ -26,7 +28,7 @@ with open(CONFIG_FILE_NAME, "r") as f:
     cfg = yaml.safe_load(f)
 
 bot_token = cfg['CONFIG']['bot_token']
-bot_admin_chat = cfg['CONFIG']['bot_admin_chat']
+admin_chat = cfg['CONFIG']['admin_chat']
 chatgpt_config_file = cfg['CONFIG']['chatgpt_config_file']
 
 # let's init the bot
@@ -39,12 +41,12 @@ def init(message=None):
 
     Args:
         message (message, optional): message from user. Defaults to None.
-    """    
+    """
 
     global chatgpt_model
 
     if message is None:
-        chat_id = bot_admin_chat
+        chat_id = admin_chat
     else:
         chat_id = message.chat.id
 
@@ -65,37 +67,26 @@ def init(message=None):
     bot.send_message(chat_id, 'Igor initialization completed')
 
 
-def log_message(message, text, if_user=True):
-    # log a message
-    try:
-        if if_user:
-            user_first_name = message.from_user.first_name
-            user_last_name = message.from_user.last_name
-        else:
-            user_first_name = 'Igor'
-            user_last_name = 'Bot'
-
-        conversation_log = open(config.conversation_log_name, 'a', encoding='utf-8')
-        conversation_log.write(str(message.date) + ';' + str(user_first_name) + ';' + str(
-            user_last_name) + ';' + text + '\n')
-        conversation_log.close()
-
-    except Exception as e:
-        bot.send_message(message.chat.id, ERROR_MESSAGE)
-
-
 @bot.message_handler(commands=['help', 'info', 'init'])
 def help_command_message(message):
 
     if message.text.find('help') > 0:
 
         bot.send_message(message.chat.id, '\n' + "Igor bot version " + BOT_VERSION + '\n' + 'Command list:' + '\n' +
-                         '/info - general information' + '\n' +
-                         '/help - Help' + '\n' +
-                         '/init - initial conversation training' + '\n')
+                         '/info - General information and status' + '\n' +
+                         '/init - Init ChatGPT model' + '\n' +
+                         '/help - Help' + '\n')
 
     if message.text.find('info') > 0:
-        bot.send_message(message.chat.id, "Igor bot version " + BOT_VERSION + '\n' + "Status: " + "Active" + '\n')
+
+        status = ""
+
+        if users_in_que > 0:
+            status = "In use"
+        else:
+            status = "Idle"
+
+        bot.send_message(message.chat.id, "Igor bot version " + BOT_VERSION + '\n' + "Status: " + status + '\n')
 
     if message.text.find('init') > 0:
         init(message)
@@ -103,6 +94,8 @@ def help_command_message(message):
 
 @bot.message_handler(content_types=["text"])
 def response_for_message(message):
+
+    global users_in_que
 
     for word in message.text.split():
 
@@ -113,22 +106,59 @@ def response_for_message(message):
             chat_title = message.chat.title
             user_full_name = message.from_user.full_name
 
-            bot.send_message(message.chat.id, user_full_name + " спасибо тебе за вопрос, мне надо немного подумать...")
+            if users_in_que > 0:
+                
+                try:
+                    bot.send_message(chat, user_full_name + ", я занят, задай вопрос попозже плз...")
+                except Exception as e:
+                    pass
+
+                break
+
+            users_in_que += 1
+
+            if chat_title is None:
+                chat_title = "Private chat"
+
+            try:
+
+                bot.send_message(chat, user_full_name + ", вопрос принят, мне надо не много подумать...")
+                bot.send_message(admin_chat, "Вопрос от " + user_full_name + " в чате " + chat_title + ":\n" + message.text)
+            
+            except Exception as e:
+                pass
 
             message_text = message.text.replace(word, '').strip()
-
             response = ""
 
-            for data in chatgpt_model.ask(message_text):
-                response = data["message"]
+            try:
 
-            bot.send_message(message.chat.id, response)
+                for data in chatgpt_model.ask(message_text):
+                    response = data["message"]
+
+            except Exception as e:
+
+                try:
+
+                    bot.send_message(chat, ERROR_MESSAGE)
+                    bot.send_message(admin_chat, str(e))
+
+                except Exception as e:
+                    pass
+
+            try:
+                bot.send_message(message.chat.id, response)
+            except Exception as e:
+                pass
+
+            users_in_que -= 1
 
             break
 
 
 if __name__ == '__main__':
 
+    # init the bot
     init()
 
     bot.polling(none_stop=True)
