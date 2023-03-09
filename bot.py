@@ -16,10 +16,10 @@ admin_chat = None
 users_in_que = 0
 
 # Global constants
-KEYWORDS = ("игорь,", "igor,", "пес,")
+KEYWORDS = ("игорь,", "igor,", "пес,", "@igorva_dev_bot", "@igorva_bot")
 
 ERROR_MESSAGE = 'Ops, something went wrong :( Pls Ask Denis to check asap!'
-BOT_VERSION = '2.0'
+BOT_VERSION = '2.0.1'
 CONFIG_FILE_NAME = "../config.yaml"
 
 
@@ -127,7 +127,7 @@ def response_for_message(message):
             try:
 
                 bot.send_message(chat, user_full_name + ", вопрос принят, мне надо немного подумать...")
-                bot.send_message(admin_chat, "Вопрос от " + user_full_name + " в чате " + chat_title + ":\n" + message.text)
+                bot.send_message(admin_chat, "Вопрос от " + user_full_name + " в чате " + chat_title + ":\n" + message_text)
 
                 response = chatgpt_model.ask(message_text)
                 

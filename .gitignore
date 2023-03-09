@@ -1,0 +1,13 @@
+__pycache__/bot.cpython-38.pyc
+__pycache__/config.cpython-37.pyc
+__pycache__/config.cpython-38.pyc
+__pycache__/config.cpython-39.pyc
+__pycache__/config.cpython-310.pyc
+__pycache__/config.cpython-311.pyc
+.vscode/launch.json
+revChatGPT/__pycache__/__init__.cpython-39.pyc
+revChatGPT/__pycache__/V1.cpython-39.pyc
+telegram_bot_access.txt
+config.json
+config.yaml
+bot.py
