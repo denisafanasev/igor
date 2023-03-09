@@ -3,7 +3,8 @@ import json
 import yaml
 
 import telebot
-from revChatGPT.V1 import Chatbot
+# from revChatGPT.V1 import Chatbot
+from revChatGPT.V3 import Chatbot
 
 # Global variables
 bot = None
@@ -15,12 +16,11 @@ admin_chat = None
 users_in_que = 0
 
 # Global constants
-KEYWORDS = ("игорь", "игорек", "игоречек", "igor", "игорю", "игоря",
-            "игорь,", "игорек,", "игоречек,", "igor,", "игорю,", "игоря,", "игорь!", "игорь?", )
+KEYWORDS = ("игорь,", "igor,", "пес,")
 
 ERROR_MESSAGE = 'Ops, something went wrong :( Pls Ask Denis to check asap!'
-BOT_VERSION = '1.0'
-CONFIG_FILE_NAME = "config.yaml"
+BOT_VERSION = '2.0'
+CONFIG_FILE_NAME = "../config.yaml"
 
 
 # read config file
@@ -29,7 +29,9 @@ with open(CONFIG_FILE_NAME, "r") as f:
 
 bot_token = cfg['CONFIG']['bot_token']
 admin_chat = cfg['CONFIG']['admin_chat']
-chatgpt_config_file = cfg['CONFIG']['chatgpt_config_file']
+chatgpt_token = cfg['CONFIG']['chatgpt_token']
+# chatgpt_config_file = cfg['CONFIG']['chatgpt_config_file']
+
 
 # let's init the bot
 bot = telebot.TeleBot(bot_token)
@@ -53,13 +55,8 @@ def init(message=None):
     bot.send_message(chat_id, 'ChatGPT initialization ...')
 
     try:
-        with open(chatgpt_config_file, "r") as f:
-         
-            chatgpt_config = json.load(f)
-            chatgpt_model = Chatbot(config=chatgpt_config)
-
+        chatgpt_model = Chatbot(chatgpt_token)
         bot.send_message(chat_id, 'ChatGPT initialization completed')
-   
     except Exception as e:
         bot.send_message(chat_id, e)
         pass
@@ -99,17 +96,17 @@ def response_for_message(message):
 
     for word in message.text.split():
 
-        if word.lower() in KEYWORDS:
+        message_id = message.id
+        chat = message.chat.id
+        chat_title = message.chat.title
+        user_full_name = message.from_user.full_name
 
-            message_id = message.id
-            chat = message.chat.id
-            chat_title = message.chat.title
-            user_full_name = message.from_user.full_name
+        if (word.lower() in KEYWORDS) or (chat_title is None):
 
             if users_in_que > 0:
                 
                 try:
-                    bot.send_message(chat, user_full_name + ", я занят, задай вопрос попозже плз...")
+                    bot.send_message(chat, user_full_name + ", я занят, задайте ваш вопрос попозже плз...")
                 except Exception as e:
                     pass
 
@@ -117,27 +114,26 @@ def response_for_message(message):
 
             users_in_que += 1
 
+            if word.lower() in KEYWORDS:
+                message_text = message.text.replace(word, '').strip()
+            else:
+                message_text = message.text.strip()
+
+            response = ""
+
             if chat_title is None:
                 chat_title = "Private chat"
 
             try:
 
-                bot.send_message(chat, user_full_name + ", вопрос принят, мне надо не много подумать...")
+                bot.send_message(chat, user_full_name + ", вопрос принят, мне надо немного подумать...")
                 bot.send_message(admin_chat, "Вопрос от " + user_full_name + " в чате " + chat_title + ":\n" + message.text)
-            
-            except Exception as e:
-                pass
 
-            message_text = message.text.replace(word, '').strip()
-            response = ""
-
-            try:
-
-                for data in chatgpt_model.ask(message_text):
-                    response = data["message"]
+                response = chatgpt_model.ask(message_text)
+                
+                bot.send_message(message.chat.id, response)
 
             except Exception as e:
-
                 try:
 
                     bot.send_message(chat, ERROR_MESSAGE)
@@ -145,11 +141,6 @@ def response_for_message(message):
 
                 except Exception as e:
                     pass
-
-            try:
-                bot.send_message(message.chat.id, response)
-            except Exception as e:
-                pass
 
             users_in_que -= 1
 
