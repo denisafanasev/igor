@@ -54,7 +54,7 @@ class ChatGPT:
         while answer is None:
             
             try:
-                
+
                 messages = self._generate_prompt_messages_for_chatgpt_api(message, dialog_messages)
                 r = openai.ChatCompletion.create(
                     model="gpt-3.5-turbo",
@@ -187,12 +187,12 @@ def response_for_message(message):
 
             try:
 
-                bot.send_chat_action(chat, 'typing')
                 bot.send_message(chat, user_full_name + ", вопрос принят, мне надо немного подумать...")
                 bot.send_message(admin_chat, "Вопрос от " + user_full_name + " в чате " + chat_title + ": " + message_text)
                 
                 conversation = conversations[chat] if chat in conversations else []
                 
+                bot.send_chat_action(chat, 'typing')
                 response = chatgpt_model.ask(message_text, conversation)
 
                 conversation.append({"user": message_text, "bot": response})
