@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
-import json
 import yaml
+from datetime import datetime
 
 import telebot
 import openai
-# from revChatGPT.V1 import Chatbot
-# from revChatGPT.V3 import Chatbot
 
 # Global variables
 bot = None
@@ -13,6 +11,7 @@ chatgpt_model = None
 bot_token = None
 chatgpt_config_file = None
 admin_chat = None
+upload_time = datetime.now()
 
 users_in_que = 0
 conversations = {}
@@ -22,8 +21,8 @@ KEYWORDS = ("игорь,", "igor,", "пес,", "@igorva_dev_bot", "@igorva_bot")
 
 CONVERSATION_LENGTH = 10
 CHAT_GPT_MODEL_NAME = "gpt-3.5-turbo"
-ERROR_MESSAGE = 'Ops, something went wrong :( Pls Ask Denis to check asap!'
-BOT_VERSION = '2.1.0'
+ERROR_MESSAGE = ''
+BOT_VERSION = '2.1.1'
 CONFIG_FILE_NAME = "../config.yaml"
 
 OPENAI_COMPLETION_OPTIONS = {
@@ -41,6 +40,7 @@ with open(CONFIG_FILE_NAME, "r") as f:
 bot_token = cfg['bot_token']
 admin_chat = cfg['admin_chat']
 chatgpt_token = cfg['chatgpt_token']
+ERROR_MESSAGE = cfg['error_message']
 
 # let's init the bot
 bot = telebot.TeleBot(bot_token)
@@ -168,9 +168,15 @@ def help_command_message(message):
 
     if message.text.find('help') > 0:
 
-        bot.send_message(message.chat.id, '\n' + "Igor bot version " + BOT_VERSION + '\n' + 'Command list:' + '\n' +
+        bot.send_message(message.chat.id,
+                         "Igor bot version " + BOT_VERSION + '\n' + 
+                         "Author: Denis Afanasev (@shamansw)" + '\n\n' +
+                         'Command list:' + '\n' +
                          '/info - General information and status' + '\n' +
-                         '/help - Help' + '\n')
+                         '/help - Help' + '\n\n' +
+                         "Igor bot is a chatbot that uses the ChatGPT model to answer questions and carry on a conversation." + "\n" +
+                         "Could be added to chats and groups and support context of the conversation." + "\n" +
+                         "You can address the bot by typing @igor_bot or by typing Igor in the begining of message on English or Russian language.")
 
     if message.text.find('info') > 0:
 
@@ -181,15 +187,15 @@ def help_command_message(message):
         else:
             status = "Idle"
 
-        bot.send_message(message.chat.id, "Igor bot version " + 
+        bot.send_message(message.chat.id,
+                        "Author: Denis Afanasev (@shamansw)" + '\n' +
+                        "Igor bot version " + 
                         BOT_VERSION + '\n' + 
-                        "Status: " + status + '\n' + 
-                        "ChatGPT model version: " + CHAT_GPT_MODEL_NAME + '\n' +
+                        "ChatGPT model version: " + CHAT_GPT_MODEL_NAME + '\n\n' +
+                        "Upload time: " + upload_time.strftime("%Y-%m-%d %H:%M:%S") + '\n' +
                         "Conversation count: " + str(len(conversations)) + '\n' +
-                        "Users in que: " + str(users_in_que) + '\n')
-    
-    if message.text.find('info') > 0:
-        bot.send_message(message.chat.id, "Help is comming soon...")
+                        "Users in que: " + str(users_in_que) + '\n' +
+                         "Status: " + status)
 
 
 @bot.message_handler(content_types=["text"])
