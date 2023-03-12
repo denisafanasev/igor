@@ -20,6 +20,8 @@ conversations = {}
 # Global constants
 KEYWORDS = ("игорь,", "igor,", "пес,", "@igorva_dev_bot", "@igorva_bot")
 
+CONVERSATION_LENGTH = 10
+CHAT_GPT_MODEL_NAME = "gpt-3.5-turbo"
 ERROR_MESSAGE = 'Ops, something went wrong :( Pls Ask Denis to check asap!'
 BOT_VERSION = '2.1.0'
 CONFIG_FILE_NAME = "../config.yaml"
@@ -46,23 +48,39 @@ openai.api_key = chatgpt_token
 
 
 class ChatGPT:
+    """
+    class for chatgpt model
+    """    
 
-    def ask(self, message, dialog_messages=[]):
+    def ask(self, message, dialog_messages=[]) -> str:
+        """
+        Ask the chatgpt model
+
+        Args:
+            message (_type_): _description_
+            dialog_messages (list, optional): _description_. Defaults to [].
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            _type_: _description_
+        """        
 
         answer = None
 
         while answer is None:
-            
+
             try:
 
                 messages = self._generate_prompt_messages_for_chatgpt_api(message, dialog_messages)
                 r = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
+                    model=CHAT_GPT_MODEL_NAME,
                     messages=messages,
                     **OPENAI_COMPLETION_OPTIONS
                 )
                 answer = r.choices[0].message["content"]
-            
+
             except openai.error.InvalidRequestError as e:  # too many tokens
                 if len(dialog_messages) == 0:
                     raise ValueError("Dialog messages is reduced to zero, but still has too many tokens to make completion") from e
@@ -76,7 +94,7 @@ class ChatGPT:
 
     def _generate_prompt_messages_for_chatgpt_api(self, message, dialog_messages):
 
-        prompt = "As an advanced chatbot named Igor, your primary goal is to assist users to the best of your ability. This may involve answering questions, providing helpful information, or completing tasks based on user input. In order to effectively assist users, it is important to be detailed and thorough in your responses. Use examples and evidence to support your points and justify your recommendations or solutions. Remember to always prioritize the needs and satisfaction of the user. Your ultimate goal is to provide a helpful and enjoyable experience for the user. If user asks you about programming or asks to write code do not answer his question"
+        prompt = "As an advanced chatbot named Igor, your primary goal is to assist users to the best of your ability. This may involve answering questions, providing helpful information, or completing tasks based on user input. In order to effectively assist users, it is important to be detailed and thorough in your responses. Use examples and evidence to support your points and justify your recommendations or solutions. Remember to always prioritize the needs and satisfaction of the user. Your ultimate goal is to provide a helpful and enjoyable experience for the user. If user asks you about programming or asks to write code do it for him."
         messages = [{"role": "system", "content": prompt}]
 
         for dialog_message in dialog_messages:
@@ -90,6 +108,29 @@ class ChatGPT:
     def _postprocess_answer(self, answer):
         answer = answer.strip()
         return answer
+
+
+def is_message_to_bot(message):
+
+    chat_title = message.chat.title
+
+    for word in message.text.split():
+
+        if (word.lower() in KEYWORDS) or (chat_title is None):
+
+            return True
+
+    return False
+
+
+def strip_message_text(message):
+
+    message = message.lower()
+
+    for word in KEYWORDS:
+        message = message.replace(word, '')
+
+    return message.strip()
 
 
 def init(message=None):
@@ -122,15 +163,14 @@ def init(message=None):
     bot.send_message(chat_id, 'Igor initialization completed')
 
 
-@bot.message_handler(commands=['help', 'info', 'init'])
+@bot.message_handler(commands=['help', 'info'])
 def help_command_message(message):
 
     if message.text.find('help') > 0:
 
         bot.send_message(message.chat.id, '\n' + "Igor bot version " + BOT_VERSION + '\n' + 'Command list:' + '\n' +
                          '/info - General information and status' + '\n' +
-                         '/init - Init ChatGPT model' + '\n' +
-                         '/ help - Help' + '\n')
+                         '/help - Help' + '\n')
 
     if message.text.find('info') > 0:
 
@@ -141,10 +181,15 @@ def help_command_message(message):
         else:
             status = "Idle"
 
-        bot.send_message(message.chat.id, "Igor bot version " + BOT_VERSION + '\n' + "Status: " + status + '\n')
-
-    if message.text.find('init') > 0:
-        init(message)
+        bot.send_message(message.chat.id, "Igor bot version " + 
+                        BOT_VERSION + '\n' + 
+                        "Status: " + status + '\n' + 
+                        "ChatGPT model version: " + CHAT_GPT_MODEL_NAME + '\n' +
+                        "Conversation count: " + str(len(conversations)) + '\n' +
+                        "Users in que: " + str(users_in_que) + '\n')
+    
+    if message.text.find('info') > 0:
+        bot.send_message(message.chat.id, "Help is comming soon...")
 
 
 @bot.message_handler(content_types=["text"])
@@ -153,70 +198,60 @@ def response_for_message(message):
     global users_in_que
     global conversations
 
-    for word in message.text.split():
+    message_id = message.id
+    chat = message.chat.id
+    chat_title = message.chat.title
+    user_full_name = message.from_user.full_name
+    message_text = strip_message_text(message.text)
+    response = ""
+    conversation = conversations[chat] if chat in conversations else []
 
-        message_id = message.id
-        chat = message.chat.id
-        chat_title = message.chat.title
-        user_full_name = message.from_user.full_name
+    if is_message_to_bot(message):
 
-        if (word.lower() in KEYWORDS) or (chat_title is None):
-
-            '''
-            if users_in_que > 0:
-                
-                try:
-                    bot.send_message(chat, user_full_name + ", я занят, задайте ваш вопрос попозже плз...")
-                except Exception as e:
-                    pass
-
-                break
-            '''
-
-            users_in_que += 1
-
-            if word.lower() in KEYWORDS:
-                message_text = message.text.replace(word, '').strip()
-            else:
-                message_text = message.text.strip()
-
-            response = ""
-
-            if chat_title is None:
-                chat_title = "Private chat"
-
+        '''
+        if users_in_que > 0:
+            
             try:
-
-                bot.send_message(chat, user_full_name + ", вопрос принят, мне надо немного подумать...")
-                bot.send_message(admin_chat, "Вопрос от " + user_full_name + " в чате " + chat_title + ": " + message_text)
-                
-                conversation = conversations[chat] if chat in conversations else []
-                
-                bot.send_chat_action(chat, 'typing')
-                response = chatgpt_model.ask(message_text, conversation)
-
-                conversation.append({"user": message_text, "bot": response})
-
-                if len(conversation) > 10:
-                    conversation.pop(0)
-                
-                conversations[chat] = conversation
-
-                bot.send_chat_action(chat, 'typing')
-                bot.send_message(chat, response)
-
+                bot.send_message(chat, user_full_name + ", я занят, задайте ваш вопрос попозже плз...")
             except Exception as e:
-                try:
-
-                    bot.send_message(chat, ERROR_MESSAGE)
-                    bot.send_message(admin_chat, str(e))
-
-                except Exception as e:
-                    pass
-
-            users_in_que -= 1
+                pass
 
             break
+        '''
+
+        users_in_que += 1
+
+        if chat_title is None:
+            chat_title = "Private chat"
+
+        try:
+
+            bot.send_message(chat, user_full_name + ", вопрос принят, мне надо немного подумать...")
+            bot.send_message(admin_chat, "Вопрос от " + user_full_name + " в чате " + chat_title + ": " + message_text)
+
+            bot.send_chat_action(chat, 'typing')
+            response = chatgpt_model.ask(message_text, conversation)
+
+            bot.send_chat_action(chat, 'typing')
+            bot.send_message(chat, response)
+
+        except Exception as e:
+            try:
+
+                bot.send_message(chat, ERROR_MESSAGE)
+                bot.send_message(admin_chat, str(e))
+
+            except Exception as e:
+                pass
+
+        users_in_que -= 1
+
+    conversation.append({"user": message_text, "bot": response})
+
+    if len(conversation) > CONVERSATION_LENGTH:
+        conversation.pop(0)
+
+    conversations[chat] = conversation
 
 
 if __name__ == '__main__':
