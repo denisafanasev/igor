@@ -20,7 +20,8 @@ conversations = {}
 KEYWORDS = ("игорь,", "igor,", "пес,", "@igorva_dev_bot", "@igorva_bot")
 
 CONVERSATION_LENGTH = 10
-CHAT_GPT_MODEL_NAME = "gpt-3.5-turbo"
+#CHAT_GPT_MODEL_NAME = "gpt-3.5-turbo"
+CHAT_GPT_MODEL_NAME = "gpt-4"
 ERROR_MESSAGE = ''
 BOT_VERSION = '2.1.1'
 CONFIG_FILE_NAME = "../config.yaml"
@@ -171,12 +172,15 @@ def help_command_message(message):
         bot.send_message(message.chat.id,
                          "Igor bot version " + BOT_VERSION + '\n' + 
                          "Author: Denis Afanasev (@shamansw)" + '\n\n' +
+                         "Model name: " + CHAT_GPT_MODEL_NAME + '\n' +
                          'Command list:' + '\n' +
                          '/info - General information and status' + '\n' +
                          '/help - Help' + '\n\n' +
+                         "News and general info: https://t.me/cdo_club" + '\n' +
+                         "Donations for support and development: https://t.me/cdo_club/1337"+ '\n\n' +
                          "Igor bot is a chatbot that uses the ChatGPT model to answer questions and carry on a conversation." + "\n" +
                          "Could be added to chats and groups and support context of the conversation." + "\n" +
-                         "You can address the bot by typing @igor_bot or by typing Igor in the begining of message on English or Russian language.")
+                         "You can address the bot by typing @@IgorVA_bot or by typing Igor in the begining of message on English or Russian language.")
 
     if message.text.find('info') > 0:
 
