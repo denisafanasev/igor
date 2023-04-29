@@ -177,7 +177,8 @@ def help_command_message(message):
                          '/info - General information and status' + '\n' +
                          '/help - Help' + '\n\n' +
                          "News and general info: https://t.me/cdo_club" + '\n' +
-                         "Donations for support and development: https://t.me/cdo_club/1337"+ '\n\n' +
+                         "Donations for support and development: https://t.me/cdo_club/1386"+ '\n' +
+                         "Donations for support and development: https://www.tinkoff.ru/rm/afanasev.denis176/kFe3R60048" + '\n\n' +
                          "Igor bot is a chatbot that uses the ChatGPT model to answer questions and carry on a conversation." + "\n" +
                          "Could be added to chats and groups and support context of the conversation." + "\n" +
                          "You can address the bot by typing @@IgorVA_bot or by typing Igor in the begining of message on English or Russian language.")
