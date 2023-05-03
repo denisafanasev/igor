@@ -20,8 +20,8 @@ conversations = {}
 KEYWORDS = ("игорь,", "igor,", "пес,", "@igorva_dev_bot", "@igorva_bot")
 
 CONVERSATION_LENGTH = 10
-#CHAT_GPT_MODEL_NAME = "gpt-3.5-turbo"
-CHAT_GPT_MODEL_NAME = "gpt-4"
+CHAT_GPT_MODEL_NAME = "gpt-3.5-turbo"
+# CHAT_GPT_MODEL_NAME = "gpt-4"
 ERROR_MESSAGE = ''
 BOT_VERSION = '2.1.1'
 CONFIG_FILE_NAME = "../config.yaml"
