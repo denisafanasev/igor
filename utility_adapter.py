@@ -3,7 +3,7 @@ import config
 import tiktoken
 
 
-class TextAdapter:
+class UtilityAdapter:
     """
     Text adapter class
     """

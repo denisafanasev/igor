@@ -2,13 +2,14 @@
 import os
 import yaml
 import pickle
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import telebot
 
 from chatgpt_adapter import ChatGPTAdapter
 from article_adapter import ArticleAdapter
-from text_adapter import TextAdapter
+from utility_adapter import UtilityAdapter
+from donater_adapter import DonaterAdapter
 import config
 
 # Global variables
@@ -26,6 +27,8 @@ conversations = {}
 tokens_counter = {}
 questions_counter = {}
 donate_messages_count = 0
+spam_interval = 0
+max_conversation_length = 0
 
 # let's init the bot
 with open(config.CONFIG_FILE_NAME, "r") as f:
@@ -33,11 +36,13 @@ with open(config.CONFIG_FILE_NAME, "r") as f:
 
 bot_token = cfg['bot_token']
 bot = telebot.TeleBot(bot_token)
+utility_adapter = UtilityAdapter()
+donater_adapter = DonaterAdapter()
 
 
 def save_state():
     """
-    Save state of the bot
+    Save state of the bot to a dump file
     """
 
     file_name = config.SYSTEM_STATE_FILE_NAME
@@ -51,7 +56,7 @@ def save_state():
 
 def load_state():
     """
-    Load state of the bot
+    Load state of the bot from a dump file
     """
 
     global conversations
@@ -83,7 +88,7 @@ def should_donate_remind(tokens, questions):
         boolean: True or False
     """
 
-    interval = 100 / (1 + (tokens/config.CONVERSATION_LENGTH) * 9 + (questions/10000) * 0.9)
+    interval = 100 / (1 + (tokens/max_conversation_length) * 9 + (questions/10000) * 0.9)
     return questions % interval < 1
 
 
@@ -94,10 +99,10 @@ def send_donate_remind(chat_id):
 
     global donate_messages_count
 
-    text_adapter = TextAdapter()
+    utility_adapter = UtilityAdapter()
 
-    bot.send_message(chat_id, 'Дорогой друг, я для тебя ответил уже на ' + text_adapter.format_number(questions_counter[chat_id]) + 
-                     ' вопросов и истратил на это ' + text_adapter.format_number(tokens_counter[chat_id]) + 
+    bot.send_message(chat_id, 'Дорогой друг, я для тебя ответил уже на ' + utility_adapter.format_number(questions_counter[chat_id]) + 
+                     ' вопросов и истратил на это ' + utility_adapter.format_number(tokens_counter[chat_id]) + 
                      ' токенов. Поддержи развитие проекта, подпишись на канал и не забывай про донаты на оплату инфраструктуры: ' + donate_message_link)
 
     donate_messages_count += 1
@@ -126,9 +131,6 @@ def force_message(message_text):
 def init():
     """
     Init the bot and the chatgpt model
-
-    Args:
-        message (message, optional): message from user. Defaults to None.
     """
 
     global chatgpt_model
@@ -138,6 +140,8 @@ def init():
     global questions_counter
     global error_message
     global donate_message_link
+    global spam_interval
+    global max_conversation_length
 
     global admin_chat
 
@@ -153,6 +157,8 @@ def init():
     chatgpt_token = cfg['chatgpt_token']
     error_message = cfg['error_message']
     donate_message_link = cfg['donate_message_link']
+    spam_interval = cfg['spam_interval']
+    max_conversation_length = cfg['max_conversation_length']
 
     chat_id = admin_chat
 
@@ -181,11 +187,10 @@ def converation_tokens(conversation):
     """
 
     conversation_tokens = 0
-    text_adapter = TextAdapter()
 
     for message in conversation:
-        conversation_tokens += text_adapter.num_tokens_from_string(message["user"], chatgpt_model.get_model_name())
-        conversation_tokens += text_adapter.num_tokens_from_string(message["bot"], chatgpt_model.get_model_name())
+        conversation_tokens += utility_adapter.num_tokens_from_string(message["user"], chatgpt_model.get_model_name())
+        conversation_tokens += utility_adapter.num_tokens_from_string(message["bot"], chatgpt_model.get_model_name())
 
     return conversation_tokens
 
@@ -265,22 +270,20 @@ def response_for_message(message):
     global tokens_counter
     global questions_counter
 
-    text_adapter = TextAdapter()
-
     chat = message.chat.id
     chat_title = message.chat.title
     user_full_name = message.from_user.full_name
-    message_text = text_adapter.strip_message_text(message.text)
+    username = message.from_user.username
+    message_text = utility_adapter.strip_message_text(message.text)
     response = ""
 
     # get conversation history and article
     conversation = conversations[chat] if chat in conversations else []
     token_counter = tokens_counter[chat] if chat in tokens_counter else 0
     question_counter = questions_counter[chat] if chat in questions_counter else 0
+                
 
-    if text_adapter.is_message_to_bot(message):
-
-        users_in_que += 1
+    if utility_adapter.is_message_to_bot(message):
 
         if chat_title is None:
             chat_title = "Private chat"
@@ -288,9 +291,27 @@ def response_for_message(message):
         bot.send_message(admin_chat, "Вопрос от " + user_full_name + " в чате " + chat_title + ": " + message_text)
         bot.send_message(chat, user_full_name + ", вопрос принят, мне надо немного подумать...")
         bot.send_chat_action(chat, 'typing')
-        
+
+        # check if user is donater
+        if not donater_adapter.is_donater(username):
+
+            last_conversation_time = datetime(1970, 1, 1, 0, 0, 0)
+
+            if len(conversation) > 0:
+                if "time" in conversation[-1].keys():
+                    last_conversation_time = conversation[-1]["time"]
+
+                    if (datetime.now() - last_conversation_time).total_seconds() < spam_interval:
+                        bot.send_message(chat, "Дорогой " + user_full_name + ", не вижу тебя в списке пользователей, поддержавших мою работу через donats, " +
+                                        "поэтому могу отвечать тебе не раньше чем один раз в " + str(spam_interval) + " секунд. Попробуй задать вопрос попозже или поддержки сервис: " + donate_message_link)
+                        bot.send_message(admin_chat, "Пользователь " + user_full_name + " пытается спамить в чате " + chat_title)
+                        return
+
+
+        users_in_que += 1
+
         # if there is a link in the text, we will try to replace the link with the text of the article
-        links = text_adapter.get_links(message_text)
+        links = utility_adapter.get_links(message_text)
 
         for link in links:
 
@@ -303,19 +324,19 @@ def response_for_message(message):
                 bot.send_message(admin_chat, str(error))
                 article_text = "эта статья мне не доступна, при ее получении произошла ошибка " + str(error)
 
-            if text_adapter.num_tokens_from_string(article_text, chatgpt_model.get_model_name()) < 8192:
+            if utility_adapter.num_tokens_from_string(article_text, chatgpt_model.get_model_name()) < 8192:
                 message_text = message_text.replace(link, article_text)
             else:
                 message_text = message_text.replace(link, "эта статья слишком длинная (больше 8192 токенов) и ее текст я не могу обработать")
 
-        if text_adapter.num_tokens_from_string(message_text, chatgpt_model.get_model_name()) > config.CONVERSATION_LENGTH:
+        if utility_adapter.num_tokens_from_string(message_text, chatgpt_model.get_model_name()) > max_conversation_length:
             message_text = "этот вопрос слишком длинный (больше 16384 токенов) и я не могу его обработать"
         
         bot.send_chat_action(chat, 'typing')
 
-        message_text_tokens = text_adapter.num_tokens_from_string(message_text, chatgpt_model.get_model_name())
+        message_text_tokens = utility_adapter.num_tokens_from_string(message_text, chatgpt_model.get_model_name())
 
-        while (converation_tokens(conversation) + message_text_tokens > config.CONVERSATION_LENGTH) and (len(conversation) > 0):
+        while (converation_tokens(conversation) + message_text_tokens > max_conversation_length) and (len(conversation) > 0):
             conversation = conversation[1:]
 
         # count tokens and questions number
@@ -333,7 +354,7 @@ def response_for_message(message):
             
         bot.send_chat_action(chat, 'typing')
 
-        conversation.append({"user": message_text, "bot": response})
+        conversation.append({"user": message_text, "bot": response, "time": datetime.now()})
 
         conversations[chat] = conversation
         tokens_counter[chat] = token_counter

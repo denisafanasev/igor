@@ -1,6 +1,6 @@
 import openai
 
-CHAT_GPT_MODEL_NAME = "gpt-3.5-turbo-16k"
+CHAT_GPT_MODEL_NAME = "gpt-3.5-turbo-1106"
 
 
 class ChatGPTAdapter:
