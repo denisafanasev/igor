@@ -1,7 +1,7 @@
 import openai
 
-# CHAT_GPT_MODEL_NAME = "gpt-3.5-turbo-1106"
-CHAT_GPT_MODEL_NAME = "gpt-4o-mini-2024-07-18"
+CHAT_GPT_MODEL_NAME = "gpt-3.5-turbo-1106"
+# CHAT_GPT_MODEL_NAME = "gpt-4o-mini-2024-07-18"
 
 class ChatGPTAdapter:
     """
