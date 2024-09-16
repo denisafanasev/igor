@@ -11,3 +11,10 @@ telegram_bot_access.txt
 config.json
 config.yaml
 bot.py
+__pycache__/article_adapter.cpython-39.pyc
+__pycache__/chatgpt_adapter.cpython-39.pyc
+__pycache__/donater_adapter.cpython-39.pyc
+__pycache__/text_adapter.cpython-39.pyc
+__pycache__/utility_adapter.cpython-39.pyc
+.gitignore
+.gitignore
