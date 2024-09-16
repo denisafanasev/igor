@@ -70,7 +70,8 @@ class UtilityAdapter:
             int: number of tokens
         """
 
-        encoding = tiktoken.encoding_for_model(encoding_name)
+        # encoding = tiktoken.encoding_for_model(encoding_name)
+        encoding = tiktoken.get_encoding('cl100k_base')
         num_tokens = len(encoding.encode(string))
         return num_tokens
     
